@@ -1,0 +1,39 @@
+{
+  "name": "mongoose-json-patch",
+  "version": "0.1.0",
+  "description": "A utility for applying RFC6902 JSONPatch operations to mongoose models",
+  "main": "index.js",
+  "scripts": {
+    "test": "npm test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/claytongulick/mongoose-json-patch.git"
+  },
+  "keywords": [
+    "mongoose",
+    "jsonpatch",
+    "json",
+    "patch",
+    "autopopulate",
+    "populate",
+    "mongodb",
+    "rfc6902",
+    "model"
+  ],
+  "author": "Clayton C Gulick",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/claytongulick/mongoose-json-patch/issues"
+  },
+  "homepage": "https://github.com/claytongulick/mongoose-json-patch#readme",
+  "dependencies": {
+    "ajv": "^6.10.0",
+    "mongoose": "^5.5.4"
+  },
+  "devDependencies": {
+    "chai": "^4.2.0",
+    "mocha": "^6.1.4",
+    "mongodb-memory-server": "^5.1.0"
+  }
+}
