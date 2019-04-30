@@ -8,6 +8,7 @@ const Author = require('./models/author');
 const Series = require('./models/series');
 
 let mongod;
+let author_id, series_id, book_id;
 
 before(async () => {
 
@@ -22,7 +23,15 @@ after(async () => {
     await mongod.stop();
 });
 
-describe("Validate", () => {
+describe("Transform", () => {
+
+});
+
+describe("Revert Patch", () => {
+
+});
+
+describe("Revert Transformation", () => {
 
 });
 
@@ -41,12 +50,15 @@ describe("Patch", () => {
                 phone_numbers: ["111-111-1111", "222-222-2222"]
             });
         await author.save();
+        author_id = author._id;
         
-        let series = new Series({name: "Lord of the Rings"});
+        let series = new Series({name: "Lord of the Rings", books: []});
         await series.save();
+        series_id = series._id;
 
         let book = new Book({name: "The Hobbit", author: author});
         await book.save();
+        book_id = book._id;
 
         series.books.push(book);
         await series.save();
@@ -55,10 +67,26 @@ describe("Patch", () => {
 
     describe("add", () => {
         it("should set a value", async () => {
+            let author = await Author.findOne({_id: author_id});
+            let patch = [
+                { path: '/first_name', op: 'add', value: 'Jimmy'}
+            ];
+            await author.jsonPatch(patch);
+            author = null;
+            author = await Author.findOne({_id: author_id});
+            assert.equal(author.first_name, 'Jimmy');
 
         });
 
         it("should set a value on a populated path", async () => {
+            let book = await Book.findOne({_id: book_id});
+            let patch = [
+                { path: '/author/first_name', op: 'add', value: 'Jimmy'}
+            ];
+            await book.jsonPatch(patch);
+            author = null;
+            author = await Author.findOne({_id: author_id});
+            assert.equal(author.first_name, 'Jimmy');
 
         });
     });

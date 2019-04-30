@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const assert = require('assert');
 const patch_schema = require('./schema.json');
+const JSONPatchRules = require('json-patch-rules');
 const Ajv = require('ajv');
 
 let ajv = new Ajv();
@@ -10,12 +11,14 @@ let validate = ajv.compile(patch_schema); //run sync at startup time
  * Utility class for applying a RFC6902 compliant json-patch transformation to a mongoose model.
  */
 class JSONPatchMongoose {
-    constructor(options) {
+    constructor(schema, options) {
         this.schema = schema;
         this.options = Object.assign({
             autopopulate: true,
             autosave: false
         },options);
+        if(options.rules)
+            this.patch_rules = new JSONPatchRules(options.rules, {mode: options.rules_mode});
         this.save_queue = [];
     }
 
@@ -36,39 +39,24 @@ class JSONPatchMongoose {
      * @param {*} document 
      * @param {*} rules 
      */
-    async apply(patch, document, rules) {
+    async apply(patch, document) {
         //first, verify the patch is a valid RFC6902 json-patch document
         if(!this.validate(patch))
             throw new Error(this.errors);
+
+        //next, make sure it passes all rules
+        if(!this.patch_rules.check(patch))
+            throw new Error("Patch failed rule check");
 
         this.schema = document.schema;
         this.save_queue = [document];
         this.document = document;
         for (const item of patch) {
             let {op, path} = item;
-            if(rules) {
-                if(!rules.op)
-                    throw new Error("No rule for patch operation: " + op);
 
-                let rule = rules.op.find(
-                    (rule) => {
-                        if(typeof rule == 'string')
-                            return rule == path;
-                        return rule.path == path;
-                    }
-                );
-                if(!rule)
-                    throw new Error(`No rule for ${op} on ${path}`);
+            await this.populatePath(path);
 
-                if(rule.invoke)
-                    if(rule.invoke in document)
-                        return await document[rule.invoke]();
-
-                await this.populatePath(path);
-
-                await this[op](item);
-
-            }
+            await this[op](item);
         }
         if(this.options.autosave)
             await Promise.all(this.save_queue.map(item => item.save()));
@@ -96,15 +84,10 @@ class JSONPatchMongoose {
         let parts = path.split('.');
         let index = parts[parts.length -1];
         let current_value;
-        if(index == '-')
-            current_value = this.document.get(
-                parts.splice(parts.length - 1).join('.')
-            );
-        else
-            current_value = this.document.get(path).parent();
-        if(Array.isArray(current_value)) {
+        let parent_array = this.parentArray(path);
+        if(parent_array) {
             if(index == '-') {
-                return parent.push(value);
+                return parent_array.push(value);
             }
             else {
                 try {
@@ -159,11 +142,40 @@ class JSONPatchMongoose {
         return path;
     }
 
+    parentArray(path) {
+        let parts = path.split('.');
+        let index = parts[parts.length - 1];
+        if(index == '-') //pointer to uncreated element at the end of an array
+            return true;
+        let int_index;
+        try {
+            int_index = parseInt(index);
+        }
+        catch(err) {
+            return false;
+        }
+
+        if(isNaN(int_index))
+            return false;
+
+        let value = this.document.get(path);
+        let parent = value.parent();
+        if(Array.isArray(parent))
+            return parent;
+        return false;
+    }
+
+
+    /**
+     * Ensure that all refs in the path are populated
+     * @param {String} path 
+     */
     async populatePath(path) {
         let parts = path.split('/');
+        parts.shift(); //get rid of first ""
         let current_object = this.document;
 
-        parts.forEach(part => {
+        for (let part of parts) {
             if(current_object.schema.obj[part].ref) {
                 //this is a mongoose reference, populate it if needed
                 if(!current_object.populated(part)) 
@@ -173,7 +185,7 @@ class JSONPatchMongoose {
 
                 current_object = current_object[part];
             }
-        });
+        };
     }
 
     async save() {

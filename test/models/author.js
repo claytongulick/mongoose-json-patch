@@ -1,9 +1,11 @@
 let mongoose = require('mongoose');
 let Schema = mongoose.Schema;
+let json_patch_plugin = require('../../index');
 
 let Author = new Schema({
     first_name: String,
     last_name: String,
+    publisher: String,
     best_sellers: [
         {
             type: Schema.Types.ObjectId,
@@ -20,6 +22,15 @@ let Author = new Schema({
     phone_numbers: [String]
 }, {
 
+});
+
+Author.plugin(json_patch_plugin, {
+    autosave: true,
+    //blacklist rules, don't allow publisher to be modified
+    rules: [
+        { path: "/publisher", op: ['add','replace','copy','move','remove','test'] }
+    ],
+    rules_mode: 'blacklist'
 });
 
 module.exports = new mongoose.model('Author', Author);
