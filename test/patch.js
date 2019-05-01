@@ -106,10 +106,37 @@ describe("Patch", () => {
             assert.equal(errored, true);
 
         });
+
+        it("should add a value to the end of an array", async () => {
+            let author = await Author.findOne({_id: author_id});
+            let patch = [
+                {op: "add", path: "/phone_numbers/-", value: "333-333-3333"},
+                {op: "add", path: "/phone_numbers/-", value: "444-444-4444"}
+            ];
+
+            await author.jsonPatch(patch);
+            author = null;
+            author = await Author.findOne({_id: author_id});
+            //these already existed
+            assert.equal(author.phone_numbers[0], "111-111-1111");
+            assert.equal(author.phone_numbers[1], "222-222-2222");
+            //new ones
+            assert.equal(author.phone_numbers[2], "333-333-3333");
+            assert.equal(author.phone_numbers[3], "444-444-4444");
+
+        });
+
+        it("should set a value at an array path", async () => {
+
+        });
     });
     
     describe("move", () => {
         it("should set new path and set old path to null", async () => {
+
+        });
+
+        it("should move an array element to a new position", async () => {
 
         });
     });
@@ -121,8 +148,12 @@ describe("Patch", () => {
 
     });
 
-    describe("delete", () => {
+    describe("remove", () => {
         it("should set the path to null", async () => {
+
+        });
+
+        it("should remove an array element", async () => {
 
         });
 

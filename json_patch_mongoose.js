@@ -59,7 +59,7 @@ class JSONPatchMongoose {
             await this[op](item);
         }
         if(this.options.autosave)
-            await Promise.all(this.save_queue.map(item => item.save()));
+            await this.save();
     }
 
     async replace(item) {
@@ -82,19 +82,18 @@ class JSONPatchMongoose {
         let {path, value} = item;
         path = this.jsonPointerToMongoosePath(path);
         let parts = path.split('.');
-        let index = parts[parts.length -1];
-        let current_value;
-        let parent_array = this.parentArray(path);
-        if(parent_array) {
-            if(index == '-') {
-                return parent_array.push(value);
+        let part = parts[parts.length -1];
+        let parent = this.walkPath(path, -1);
+        if(Array.isArray(parent)) {
+            if(part == '-') {
+                return parent.push(value);
             }
             else {
                 try {
-                    index = parseInt(index);
+                    part = parseInt(index);
                     //this calls mongoose splice, which has proper change tracking
                     //rfc6902 says we don't spread aray values, we just add an array element
-                    current_value.splice(index,0,value);
+                    parent.splice(index,0,value);
                 }
                 catch(err) {
                     throw new Error("Invalid index value: " + index + " for array add");
@@ -102,7 +101,7 @@ class JSONPatchMongoose {
             }
         }
         else
-            this.document.set(path, value);
+            parent.set(part, value);
     }
 
     async copy(item) {
@@ -145,10 +144,29 @@ class JSONPatchMongoose {
         if(!path.includes('.'))
             return this.document.set(path, value);
 
+        let parent = this.walkPath(path,-1);
+        let parts = path.split("."); //all this splitting is redundant, perhaps parts should be passed around instead of path strings
+        let part = parts[parts.length - 1];
+
+        parent.set(part, value);
+    }
+
+    /**
+     * Walk down a mongoose dotted path, dereferencing objects. Return the value at the 'index' position in the path, or if index isn't specified, the
+     * 'leaf' pointed to by the entire path. A negative index will indicate an offset from the end of the path.
+     * @param {*} path 
+     * @param {*} index 
+     */
+    walkPath(path, index) {
         let parts = path.split(".");
+        if(typeof index == 'undefined')
+            index = parts.length;
+        if(index < 0)
+            index = parts.length + index;
+
         let parent = this.document;
         let part;
-        for (let i=0; i<parts.length; i++) {
+        for (let i=0; i<index; i++) {
             part = parts[i];
 
             if(Array.isArray(parent)) {
@@ -162,7 +180,8 @@ class JSONPatchMongoose {
 
             parent = parent[part];
         }
-        parent.set(part, value);
+
+        return parent;
     }
 
     jsonPointerToMongoosePath(path) {
@@ -205,6 +224,10 @@ class JSONPatchMongoose {
         let current_object = this.document;
 
         for (let part of parts) {
+            //pointer to the end of an array gets skipped
+            if(part == '-')
+                continue;
+
             if(current_object.schema.obj[part].ref) {
                 //this is a mongoose reference, populate it if needed
                 if(!current_object.populated(part)) 
@@ -219,7 +242,11 @@ class JSONPatchMongoose {
     }
 
     async save() {
-
+        await Promise.all(
+            this.save_queue.map(
+                item => item.save()
+            )
+        );
     }
 } 
 
