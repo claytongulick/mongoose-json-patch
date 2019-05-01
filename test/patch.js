@@ -38,9 +38,9 @@ describe("Revert Transformation", () => {
 describe("Patch", () => {
 
     beforeEach("init documents", async () => {
-        await Author.remove({});
-        await Series.remove({});
-        await Book.remove({});
+        await Author.deleteMany({});
+        await Series.deleteMany({});
+        await Book.deleteMany({});
 
         let author = new Author(
             {
@@ -126,7 +126,40 @@ describe("Patch", () => {
 
         });
 
+        it("should add a new object to a populated array", async () => {
+            let series = await Series.findOne({_id: series_id});
+            let patch = [
+                {op: "add", path: "/books/-", value: {name: "Fellowship Of The Ring", author: author_id}},
+                {op: "add", path: "/books/-", value: {name: "The Two Towers", author: author_id}}
+            ];
+            await series.jsonPatch(patch);
+            let book = await Book.findOne({name: "The Two Towers"});
+            assert.equal(book.name, "The Two Towers");
+
+            series = null;
+            series = await Series.findOne({_id: series_id});
+            await series.populate("books").execPopulate();
+            assert.equal(series.books[1].name, "Fellowship Of The Ring");
+            assert.equal(series.books[2].name, "The Two Towers");
+
+        });
+
         it("should set a value at an array path", async () => {
+            let series = await Series.findOne({_id: series_id});
+            let patch = [
+                {op: "add", path: "/books/-", value: book_id},
+                {op: "add", path: "/books/-", value: {name: "Fellowship Of The Ring", author: author_id}},
+                {op: "add", path: "/books/-", value: {name: "The Two Towers", author: author_id}},
+                { op: "replace", path: "/books/0/name", value: "Return Of The King" }
+            ]
+
+            await series.jsonPatch(patch);
+            series = await Series.findOne({_id: series_id});
+            await series.populate("books").execPopulate();
+            assert.equal(series.books[0].name, "Return Of The King");
+            //this should have been changed by the "replace" patch operation on item 0
+            let book = await Book.findOne({_id: book_id});
+            assert.equal(book.name, "Return Of The King");
 
         });
     });

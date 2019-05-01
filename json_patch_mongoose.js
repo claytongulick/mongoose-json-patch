@@ -85,6 +85,29 @@ class JSONPatchMongoose {
         let part = parts[parts.length -1];
         let parent = this.walkPath(path, -1);
         if(Array.isArray(parent)) {
+            //this should always be true
+            if(parent.isMongooseArray) {
+                let array_schema = parent.$schema();
+                //if it looks like this is an array of object refs
+                if(array_schema.options &&  //just
+                    array_schema.options.type &&  //being
+                    array_schema.options.type.length &&  //really
+                    array_schema.options.type[0].ref) { //safe
+                    let model = mongoose.model(array_schema.options.type[0].ref);
+                    //and the value is an object
+                    if(value instanceof Object) {
+                        //but it isn't an existing ObjectId
+                        if(!(mongoose.Types.ObjectId.isValid(value))) {
+                            //autosave must be true for this to work, because we have to save the instance before we can push it to the mongoose array
+                            if(this.options.autosave == false)
+                                throw new Error("Autosave must be turned on to add array elements to populated path");
+                            //create a new model instance
+                            value = new model(value);
+                            await value.save();
+                        }
+                    }
+                }
+            }
             if(part == '-') {
                 return parent.push(value);
             }
@@ -184,33 +207,31 @@ class JSONPatchMongoose {
         return parent;
     }
 
+    *iteratePath(path) {
+        let parts = path.split(".");
+        let parent = this.document;
+        let part;
+        for (let i=0; i<index; i++) {
+            part = parts[i];
+
+            if(Array.isArray(parent)) {
+                part = parseInt(part);
+                if(isNaN(part))
+                    throw new Error("Invalid index on array: " + part);
+            }
+
+            if(i === (parts.length - 1))
+                break;
+
+            parent = parent[part];
+            yield parent;
+        }
+    }
+
     jsonPointerToMongoosePath(path) {
         path = path.substring(1);
         path = path.replace(/\//g,'.');
         return path;
-    }
-
-    parentArray(path) {
-        let parts = path.split('.');
-        let index = parts[parts.length - 1];
-        if(index == '-') //pointer to uncreated element at the end of an array
-            return true;
-        let int_index;
-        try {
-            int_index = parseInt(index);
-        }
-        catch(err) {
-            return false;
-        }
-
-        if(isNaN(int_index))
-            return false;
-
-        let value = this.document.get(path);
-        let parent = value.parent();
-        if(Array.isArray(parent))
-            return parent;
-        return false;
     }
 
 
@@ -226,8 +247,37 @@ class JSONPatchMongoose {
         for (let part of parts) {
             //pointer to the end of an array gets skipped
             if(part == '-')
-                continue;
+                break; //- must be the last item in a path
+            
+            let schema;
 
+            //if the current object is an array, the part must be convertable to a integer index
+            if(Array.isArray(current_object)) {
+                part = parseInt(part);
+                if(isNaN(part)) 
+                    throw new Error("Invalid array index: " + part);
+            }
+
+            //if the child property is an array, and it's an array of refs, we need to populate it too
+            if(Array.isArray(current_object[part])) {
+                let array_schema = current_object[part].$schema();
+                if(array_schema.options.type[0].ref)
+                    if(!current_object.populated(part))
+                        await current_object.populate(part).execPopulate();
+
+                current_object = current_object[part];
+                continue;
+            }
+
+            //if the current object is an array, and the current part is an index, just keep navigating
+            if(Array.isArray(current_object)) {
+                current_object = current_object[part]
+                if(!(this.save_queue.includes(current_object)))
+                    this.save_queue.push(current_object);
+                continue;
+            }
+
+            //the current object isn't an array, so let's see if the child needs to be populated
             if(current_object.schema.obj[part].ref) {
                 //this is a mongoose reference, populate it if needed
                 if(!current_object.populated(part)) 
