@@ -81,12 +81,29 @@ describe("Patch", () => {
         it("should set a value on a populated path", async () => {
             let book = await Book.findOne({_id: book_id});
             let patch = [
-                { path: '/author/first_name', op: 'add', value: 'Jimmy'}
+                { path: '/author/first_name', op: 'replace', value: 'James'}
             ];
             await book.jsonPatch(patch);
-            author = null;
-            author = await Author.findOne({_id: author_id});
-            assert.equal(author.first_name, 'Jimmy');
+            book = null;
+            book = await Book.findOne({_id: book_id});
+            await book.populate("author").execPopulate();
+            assert.equal(book.author.first_name, 'James');
+        });
+
+        it("should fail to set a value on a blacklisted path", async () => {
+            let book = await Book.findOne({_id: book_id});
+            let patch = [
+                { path: '/publisher', op: 'replace', value: 'Random House'}
+            ];
+
+            let errored = false;
+            try {
+                await book.jsonPatch(patch);
+            }
+            catch(err) {
+                errored = true;
+            }
+            assert.equal(errored, true);
 
         });
     });

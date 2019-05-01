@@ -1,12 +1,14 @@
 let mongoose = require('mongoose');
 let Schema = mongoose.Schema;
+let json_patch_plugin = require('../../index');
 
 let Book = new Schema({
     name: String,
     author: {
         type: Schema.Types.ObjectId,
         ref: "Author"
-    }
+    },
+    publisher: String
 }, {
 
 });

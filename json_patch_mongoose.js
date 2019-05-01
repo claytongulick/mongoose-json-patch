@@ -65,7 +65,7 @@ class JSONPatchMongoose {
     async replace(item) {
         let {path, value} = item;
         path = this.jsonPointerToMongoosePath(path);
-        this.document.set(path, value);
+        this.setPath(path, value);
     }
 
     async remove(item) {
@@ -136,6 +136,35 @@ class JSONPatchMongoose {
         }
     }
 
+    /**
+     * Mongoose "set" doesn't work with a populated path. This method walks a populated path and ensures 'set' is called on the leaf.
+     * @param {*} path 
+     * @param {*} value 
+     */
+    setPath(path, value) {
+        if(!path.includes('.'))
+            return this.document.set(path, value);
+
+        let parts = path.split(".");
+        let parent = this.document;
+        let part;
+        for (let i=0; i<parts.length; i++) {
+            part = parts[i];
+
+            if(Array.isArray(parent)) {
+                part = parseInt(part);
+                if(isNaN(part))
+                    throw new Error("Invalid index on array: " + part);
+            }
+
+            if(i === (parts.length - 1))
+                break;
+
+            parent = parent[part];
+        }
+        parent.set(part, value);
+    }
+
     jsonPointerToMongoosePath(path) {
         path = path.substring(1);
         path = path.replace(/\//g,'.');
@@ -179,9 +208,10 @@ class JSONPatchMongoose {
             if(current_object.schema.obj[part].ref) {
                 //this is a mongoose reference, populate it if needed
                 if(!current_object.populated(part)) 
-                    await current_object.execPopulate(part);
+                    await current_object.populate(part).execPopulate();
 
-                this.save_queue.push(current_object);
+                if(!(this.save_queue.includes(current_object[part])))
+                    this.save_queue.push(current_object[part]);
 
                 current_object = current_object[part];
             }
