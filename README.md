@@ -15,6 +15,7 @@ npm install --save mongoose-patcher
 const json_patch_plugin = require('mongoose-patcher');
 const options = {
     autosave: true, //should the model be automatically saved when the patch is applied?
+    middleware: [...] //see middelware below
     rules: [...], //JSON Patch Rules
     rules_mode: 'whitelist', //how should rules be applied, as a blacklist or whitelist? more info below
 
@@ -76,6 +77,28 @@ Alternately, in the case of a User object, perhaps there are only a small number
 
 For more information on defining rules see: [json-patch-rules](https://github.com/claytongulick/json-patch-rules).
 
+## middleware
+In some cases, a value should be changed or manipulated before being applied to a model, or even removed completely.
 
+To handle these cases, middleware can be defined and passed into the options. This allows preprocessing of patch items, or the addition of 'virtual' properties on a model.
+
+```javascript
+let options = {
+    ...
+    middleware: [
+        {op: 'replace', path: '/password', handler: async (document, item, next) => {
+            item.value = await calculateHash(item.value);
+            await next(item);
+        }}
+    ]
+    ...
+}
+```
+
+A middleware funtion will be passed the mongoose document, the current patch item, and the next operation to perform, which is the utility operation from the patcher instance.
+
+Currently, only the first matching middleware function will be applied, though this may change in the future if there's a need.
+
+If you do not want the model to be modified, just return without calling next();
 
 

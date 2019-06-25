@@ -163,6 +163,31 @@ describe("Patch", () => {
 
         });
     });
+
+    describe("middleware", () => {
+        it("should execute matching middleware properly", async ()=> {
+            let author = await Author.findOne({_id: author_id});
+            let patch = [
+                { path: '/first_name', op: 'add', value: 'Jimmy'}
+            ];
+            let options = {
+                autosave: true,
+                middleware: [
+                    {op: 'add', path: '/first_name', handler: 
+                        async (document, item, next) => {
+                            item.value = "Jimmie";
+                            await next(item);
+                        }
+                    }
+                ]
+            }
+            await author.jsonPatch(patch, options);
+            author = null;
+            author = await Author.findOne({_id: author_id});
+            assert.equal(author.first_name, 'Jimmie');
+
+        });
+    });
     
     describe("move", () => {
         it("should set new path and set old path to null", async () => {

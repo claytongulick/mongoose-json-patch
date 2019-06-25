@@ -44,8 +44,9 @@ class JSONPatchMongoose {
             throw new Error(this.errors);
 
         //next, make sure it passes all rules
-        if(!this.patch_rules.check(patch))
-            throw new Error("Patch failed rule check");
+        if(this.patch_rules)
+            if(!this.patch_rules.check(patch))
+                throw new Error("Patch failed rule check");
 
         this.schema = document.schema;
         this.save_queue = [document];
@@ -54,8 +55,25 @@ class JSONPatchMongoose {
             let {op, path} = item;
 
             await this.populatePath(path);
+            let middleware_handler;
 
-            await this[op](item);
+            //check to see if we have any middleware defined
+            if(this.options.middleware)
+                for(let middleware of this.options.middleware) {
+                    if(middleware.op == op) {
+                        if(!middleware.regex)
+                            middleware.regex = new RegExp(middleware.path);
+                        if(middleware.regex.test(path)) {
+                            middleware_handler = middleware.handler;
+                            break;
+                        }
+                    }
+                }
+
+            if(middleware_handler)
+                await middleware_handler(document, item, this[op].bind(this));
+            else
+                await this[op](item);
         }
         if(this.options.autosave)
             await this.save();
