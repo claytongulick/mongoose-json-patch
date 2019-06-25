@@ -7,12 +7,12 @@ Additionally, rules can be applied to the patch for authorization checks and val
 
 
 # Installation
-npm install --save mongoose-json-patch
+npm install --save mongoose-patcher
 
 # Usage
 ## As a mongoose plugin
 ```javascript
-const json_patch_plugin = require('mongoose-json-patch');
+const json_patch_plugin = require('mongoose-patcher');
 const options = {
     autosave: true, //should the model be automatically saved when the patch is applied?
     autopopulate: true, //deep populate object refs
