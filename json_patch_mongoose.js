@@ -14,7 +14,6 @@ class JSONPatchMongoose {
     constructor(schema, options) {
         this.schema = schema;
         this.options = Object.assign({
-            autopopulate: true,
             autosave: false
         },options);
         if(options.rules)

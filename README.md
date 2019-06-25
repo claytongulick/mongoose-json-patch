@@ -15,17 +15,36 @@ npm install --save mongoose-patcher
 const json_patch_plugin = require('mongoose-patcher');
 const options = {
     autosave: true, //should the model be automatically saved when the patch is applied?
-    autopopulate: true, //deep populate object refs
     rules: [...], //JSON Patch Rules
     rules_mode: 'whitelist', //how should rules be applied, as a blacklist or whitelist? more info below
 
 };
-SomeModel.plugin(json_patch_plugin, options);
+SomeModel.plugin(json_patch_plugin, options); //options can be applied at the schema level, or when the patch is applied
 
 let model_instance = await SomeModel.findOne({...});
 
 await model_instance.jsonPatch(patch); //patches are applied asyncronously
 //model_instance will now have the patch applied
+```
+
+Options can also be applied at the time of patching, or when the patch is applied. This can be useful for cases where rules may differ based on the authenticated user, for example:
+
+```javascript
+let options;
+if(req.user.role='admin')
+    options = {
+        rules: [], //allow admin to do everything
+        rules_mode: 'blacklist'
+    }
+if(req.user.role='restricted')
+    options = {
+        rules: [
+            {path: '/something/limited', op: 'replace'}
+        ],
+        rules_mode: 'whitelist'
+    }
+
+model_instance.jsonPatch(patch, options);
 ```
 
 ## rules_mode
