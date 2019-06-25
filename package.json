@@ -4,7 +4,7 @@
   "description": "A utility for applying RFC6902 JSONPatch operations to mongoose models",
   "main": "index.js",
   "scripts": {
-    "test": "npm test"
+    "test": "npx mocha"
   },
   "repository": {
     "type": "git",
