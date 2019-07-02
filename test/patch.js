@@ -78,6 +78,18 @@ describe("Patch", () => {
 
         });
 
+        it("should set a value on a subdoc", async () => {
+            let author = await Author.findOne({_id: author_id});
+            let patch = [
+                { path: '/address/city', op: 'replace', value: 'New York'}
+            ];
+            await author.jsonPatch(patch);
+            author = null;
+            author = await Author.findOne({_id: author_id});
+            assert.equal(author.address.city, 'New York');
+
+        });
+
         it("should set a value on a populated path", async () => {
             let book = await Book.findOne({_id: book_id});
             let patch = [

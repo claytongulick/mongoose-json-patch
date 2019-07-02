@@ -176,19 +176,27 @@ class JSONPatchMongoose {
     }
 
     /**
+     * Test for whether this object is a top level mongoose object or a subdoc
+     * This is done by 
+     * @param {*} object 
+     */
+    isSubDoc(object, root) {
+        if(!root)
+            root = this.document;
+        return ((current_object != root) && (current_object.schema == root.schema)) 
+    }
+
+    /**
      * Mongoose "set" doesn't work with a populated path. This method walks a populated path and ensures 'set' is called on the leaf.
      * @param {*} path 
      * @param {*} value 
      */
     setPath(path, value) {
-        if(!path.includes('.'))
-            return this.document.set(path, value);
+        //if(!path.includes('.'))
+            //return this.document.set(path, value);
 
-        let parent = this.walkPath(path,-1);
-        let parts = path.split("."); //all this splitting is redundant, perhaps parts should be passed around instead of path strings
-        let part = parts[parts.length - 1];
-
-        parent.set(part, value);
+        let path_info = this.path_info[path];
+        path_info.root.set(path_info.relative_path, value);
     }
 
     /**
@@ -259,15 +267,55 @@ class JSONPatchMongoose {
     async populatePath(path) {
         let parts = path.split('/');
         parts.shift(); //get rid of first ""
-        let current_object = this.document;
+        let relative_root = this.document;
+        let relative_root_index = -1;
+        let absolute_path = '';
+        let relative_path = '';
+        let current_object = relative_root;
+        this.path_info = {};
 
-        for (let part of parts) {
+        for (let i=0; i<=parts.length; i++) {
+            //cache information about the path for later assignment (setPath)
+            if(current_object == this.document) {
+                this.path_info[absolute_path] = {
+                    absolute_path: '',
+                    relative_path: '',
+                    root: this.document,
+                    document: this.document,
+                    type: 'root'
+                }
+            }
+            else if(current_object.schema && (current_object.schema != relative_root.schema)) {
+                this.path_info[absolute_path] = {
+                    absolute_path: absolute_path,
+                    relative_path: relative_path,
+                    root: relative_root,
+                    document: current_object,
+                    type: 'root'
+                }
+                relative_root = current_object;
+                relative_root_index = i-1;
+            }
+            else {
+                this.path_info[absolute_path] = {
+                    absolute_path: absolute_path,
+                    relative_path: relative_path,
+                    root: relative_root,
+                    document: current_object,
+                    type: 'subdoc'
+                }
+            }
+            if(i==parts.length)
+                break;
+            let part = parts[i];
+            absolute_path = parts.slice(0,i+1).join('.');
+            relative_path = parts.slice(relative_root_index + 1, i+1).join('.');
+
+
             //pointer to the end of an array gets skipped
             if(part == '-')
                 break; //- must be the last item in a path
             
-            let schema;
-
             //if the current object is an array, the part must be convertable to a integer index
             if(Array.isArray(current_object)) {
                 part = parseInt(part);
@@ -278,9 +326,11 @@ class JSONPatchMongoose {
             //if the child property is an array, and it's an array of refs, we need to populate it too
             if(Array.isArray(current_object[part])) {
                 let array_schema = current_object[part].$schema();
-                if(array_schema.options.type[0].ref)
+                if(array_schema.options.type[0].ref) {
                     if(!current_object.populated(part))
                         await current_object.populate(part).execPopulate();
+                }
+                
 
                 current_object = current_object[part];
                 continue;
@@ -294,6 +344,12 @@ class JSONPatchMongoose {
                 continue;
             }
 
+            //if we're in a subdoc, just continue
+            if((current_object != this.document) && (i > relative_root_index) && (current_object.schema == relative_root.schema)) {
+                current_object = current_object[part];
+                continue;
+            }
+
             //the current object isn't an array, so let's see if the child needs to be populated
             if(current_object.schema.obj[part].ref) {
                 //this is a mongoose reference, populate it if needed
@@ -302,9 +358,9 @@ class JSONPatchMongoose {
 
                 if(!(this.save_queue.includes(current_object[part])))
                     this.save_queue.push(current_object[part]);
-
-                current_object = current_object[part];
             }
+
+            current_object = current_object[part];
         };
     }
 
