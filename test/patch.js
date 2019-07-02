@@ -8,7 +8,7 @@ const Author = require('./models/author');
 const Series = require('./models/series');
 
 let mongod;
-let author_id, series_id, book_id;
+let author_id, coauthor_id, series_id, book_id;
 
 before(async () => {
 
@@ -51,6 +51,16 @@ describe("Patch", () => {
             });
         await author.save();
         author_id = author._id;
+
+        let coauthor = new Author(
+            {
+                first_name: "Clay", 
+                last_name: "Gulick", 
+                address: {city: "NoWhere", state:"TX", zip: "12345", address_1: "123 anywhere dr"},
+                phone_numbers: ["111-111-1111", "222-222-2222"]
+            });
+        await coauthor.save();
+        coauthor_id = coauthor._id;
         
         let series = new Series({name: "Lord of the Rings", books: []});
         await series.save();
@@ -78,46 +88,6 @@ describe("Patch", () => {
 
         });
 
-        it("should set a value on a subdoc", async () => {
-            let author = await Author.findOne({_id: author_id});
-            let patch = [
-                { path: '/address/city', op: 'replace', value: 'New York'}
-            ];
-            await author.jsonPatch(patch);
-            author = null;
-            author = await Author.findOne({_id: author_id});
-            assert.equal(author.address.city, 'New York');
-
-        });
-
-        it("should set a value on a populated path", async () => {
-            let book = await Book.findOne({_id: book_id});
-            let patch = [
-                { path: '/author/first_name', op: 'replace', value: 'James'}
-            ];
-            await book.jsonPatch(patch);
-            book = null;
-            book = await Book.findOne({_id: book_id});
-            await book.populate("author").execPopulate();
-            assert.equal(book.author.first_name, 'James');
-        });
-
-        it("should fail to set a value on a blacklisted path", async () => {
-            let book = await Book.findOne({_id: book_id});
-            let patch = [
-                { path: '/publisher', op: 'replace', value: 'Random House'}
-            ];
-
-            let errored = false;
-            try {
-                await book.jsonPatch(patch);
-            }
-            catch(err) {
-                errored = true;
-            }
-            assert.equal(errored, true);
-
-        });
 
         it("should add a value to the end of an array", async () => {
             let author = await Author.findOne({_id: author_id});
@@ -176,6 +146,125 @@ describe("Patch", () => {
         });
     });
 
+    describe("move", () => {
+        it("should set new path and set old path to null", async () => {
+
+        });
+
+        it("should move an array element to a new position", async () => {
+
+        });
+    });
+
+    describe("replace", () => {
+        it("should set a value on a subdoc", async () => {
+            let author = await Author.findOne({_id: author_id});
+            let patch = [
+                { path: '/address/city', op: 'replace', value: 'New York'}
+            ];
+            await author.jsonPatch(patch);
+            author = null;
+            author = await Author.findOne({_id: author_id});
+            assert.equal(author.address.city, 'New York');
+
+        });
+
+        it("should set a value on a populated path", async () => {
+            let book = await Book.findOne({_id: book_id});
+            let patch = [
+                { path: '/author/first_name', op: 'replace', value: 'James'}
+            ];
+            await book.jsonPatch(patch);
+            book = null;
+            book = await Book.findOne({_id: book_id});
+            await book.populate("author").execPopulate();
+            assert.equal(book.author.first_name, 'James');
+        });
+
+        it("should set a reference in a subdoc", async () => {
+            let book = await Book.findOne({_id: book_id});
+            let patch = [
+                { path: '/coauthor/author', op: 'replace', value: coauthor_id}
+            ];
+            await book.jsonPatch(patch);
+            book = null;
+            book = await Book.findOne({_id: book_id});
+            await book.populate("coauthor.author").execPopulate();
+            assert.equal(book.coauthor.author.first_name, 'Clay');
+        });
+
+        it("should set a objectId value that's not a ref, and is unset", async () => {
+            let book = await Book.findOne({_id: book_id});
+            let patch = [
+                { path: '/reference_id', op: 'replace', value: coauthor_id}
+            ];
+            await book.jsonPatch(patch);
+            book = null;
+            book = await Book.findOne({_id: book_id});
+            assert.equal(book.reference_id.toString(), coauthor_id.toString());
+
+        });
+
+        it("should set a objectId value that's not a ref, and is already set", async () => {
+            let book = await Book.findOne({_id: book_id});
+            book.reference_id = author_id;
+            await book.save();
+            let patch = [
+                { path: '/reference_id', op: 'replace', value: coauthor_id}
+            ];
+            await book.jsonPatch(patch);
+            book = null;
+            book = await Book.findOne({_id: book_id});
+            assert.equal(book.reference_id.toString(), coauthor_id.toString());
+
+        });
+
+        it("should set a value on a populated path in a subdoc", async () => {
+            let book = await Book.findOne({_id: book_id});
+            book.coauthor.author = coauthor_id;
+            await book.save();
+            let patch = [
+                { path: '/coauthor/author/first_name', op: 'replace', value: 'Clayton'}
+            ];
+            await book.jsonPatch(patch);
+            book = null;
+            book = await Book.findOne({_id: book_id});
+            await book.populate("coauthor.author").execPopulate();
+            assert.equal(book.coauthor.author.first_name, 'Clayton');
+            let coauthor = await Author.findOne({_id: coauthor_id});
+            assert.equal(coauthor.first_name, "Clayton");
+        });
+
+        it("should fail to set a value on a blacklisted path", async () => {
+            let book = await Book.findOne({_id: book_id});
+            let patch = [
+                { path: '/publisher', op: 'replace', value: 'Random House'}
+            ];
+
+            let errored = false;
+            try {
+                await book.jsonPatch(patch);
+            }
+            catch(err) {
+                errored = true;
+            }
+            assert.equal(errored, true);
+
+        });
+
+    });
+
+    describe("remove", () => {
+        it("should set the path to null", async () => {
+
+        });
+
+        it("should remove an array element", async () => {
+
+        });
+
+    });
+
     describe("middleware", () => {
         it("should execute matching middleware properly", async ()=> {
             let author = await Author.findOne({_id: author_id});
@@ -201,32 +290,5 @@ describe("Patch", () => {
         });
     });
     
-    describe("move", () => {
-        it("should set new path and set old path to null", async () => {
-
-        });
-
-        it("should move an array element to a new position", async () => {
-
-        });
-    });
-
-    describe("replace", () => {
-        it("should set the new value", async () => {
-
-        });
-
-    });
-
-    describe("remove", () => {
-        it("should set the path to null", async () => {
-
-        });
-
-        it("should remove an array element", async () => {
-
-        });
-
-    });
 
 });

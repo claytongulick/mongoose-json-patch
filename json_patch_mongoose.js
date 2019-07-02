@@ -92,7 +92,7 @@ class JSONPatchMongoose {
         let current_value = this.document.get(path);
         if(Array.isArray(current_value.parent()))
             return current_value.remove();
-        this.document.set(path, null);
+        this.setPath(path, null);
     }
 
     async add(item) {
@@ -141,7 +141,7 @@ class JSONPatchMongoose {
             }
         }
         else
-            parent.set(part, value);
+            this.setPath(path, value);
     }
 
     async copy(item) {
@@ -149,7 +149,7 @@ class JSONPatchMongoose {
         from = this.jsonPointerToMongoosePath(from);
         path = this.jsonPointerToMongoosePath(path);
         let value = this.document.get(from);
-        this.document.set(path, value);
+        this.setPath(path, value);
     }
 
     async move(item) {
@@ -159,8 +159,8 @@ class JSONPatchMongoose {
         path = this.jsonPointerToMongoosePath(path);
         let from_parts = from.split('.');
         let value = this.document.get(from);
-        this.document.set(path, value);
-        this.document.set(from, null);
+        this.setPath(path, value);
+        this.setPath(from, null);
     }
 
     async test(item) {
@@ -192,9 +192,6 @@ class JSONPatchMongoose {
      * @param {*} value 
      */
     setPath(path, value) {
-        //if(!path.includes('.'))
-            //return this.document.set(path, value);
-
         let path_info = this.path_info[path];
         path_info.root.set(path_info.relative_path, value);
     }
@@ -266,6 +263,7 @@ class JSONPatchMongoose {
      */
     async populatePath(path) {
         let parts = path.split('/');
+        let part;
         parts.shift(); //get rid of first ""
         let relative_root = this.document;
         let relative_root_index = -1;
@@ -275,7 +273,11 @@ class JSONPatchMongoose {
         this.path_info = {};
 
         for (let i=0; i<=parts.length; i++) {
+            if(i < parts.length)
+                part = parts[i];
+
             //cache information about the path for later assignment (setPath)
+            //if we're on the root document
             if(current_object == this.document) {
                 this.path_info[absolute_path] = {
                     absolute_path: '',
@@ -284,7 +286,55 @@ class JSONPatchMongoose {
                     document: this.document,
                     type: 'root'
                 }
+                if(!this.save_queue.includes(current_object))
+                    this.save_queue.push(current_object);
             }
+            //if the current object is null or undefined -
+            //this can happen if we're setting a value in a subdoc or object ref that's new
+            else if(!current_object) {
+                //if this isn't the end of the path, there's a problem, the user needs to patch to create this first
+                if(i != (parts.length) )
+                    throw new Error("Attempt to operate on empty path - do you need to create the path first?");
+
+                this.path_info[absolute_path] = {
+                    absolute_path: absolute_path,
+                    relative_path: relative_path,
+                    root: relative_root,
+                    document: current_object,
+                    type: 'leaf'
+                }
+
+            }
+            //If this is an ObjectId, it may or may not be a ref that needs to be populated
+            else if(current_object instanceof mongoose.Types.ObjectId) {
+                //if this has a ref in the schema, it needs to be populated
+                if(relative_root.schema.paths[relative_path].options.ref) {
+                    this.path_info[absolute_path] = {
+                        absolute_path: absolute_path,
+                        relative_path: relative_path,
+                        root: relative_root,
+                        document: current_object,
+                        type: 'root'
+                    }
+                    await relative_root.populate(relative_path).execPopulate();
+                    current_object = relative_root.get(relative_path);
+                    relative_root = current_object;
+                    relative_root_index = i-1;
+                    if(!this.save_queue.includes(current_object))
+                        this.save_queue.push(current_object);
+                }
+                //this is just an object id floating out there, it's a leaf
+                else {
+                    this.path_info[absolute_path] = {
+                        absolute_path: absolute_path,
+                        relative_path: relative_path,
+                        root: relative_root,
+                        document: current_object,
+                        type: 'leaf'
+                    }
+                }
+            }
+            //if this is a non-array document, and is not a subdoc, but a ref'd model
             else if(current_object && current_object.schema && (current_object.schema != relative_root.schema)) {
                 this.path_info[absolute_path] = {
                     absolute_path: absolute_path,
@@ -295,8 +345,49 @@ class JSONPatchMongoose {
                 }
                 relative_root = current_object;
                 relative_root_index = i-1;
+                if(!this.save_queue.includes(current_object))
+                    this.save_queue.push(current_object);
             }
-            else {
+            //if this is an array
+            else if(Array.isArray(current_object)) {
+                let array_schema = current_object.$schema();
+
+                //if the current object is an array, the part must be convertable to a integer index
+                if(i < parts.length) {
+                    if(part != '-') {
+                        part = parseInt(part);
+                        if (isNaN(part))
+                            throw new Error("Invalid array index: " + part);
+                    }
+                }
+
+                //if it's an array of linked refs
+                if(array_schema.options.type[0].ref) {
+                    this.path_info[absolute_path] = {
+                        absolute_path: absolute_path,
+                        relative_path: relative_path,
+                        root: relative_root,
+                        document: current_object,
+                        type: 'ref_array'
+                    }
+                    if(!relative_root.populated(relative_path))
+                        await relative_root.populate(relative_path).execPopulate();
+                }
+                //if it's just an array of subdocs, no linked refs
+                else {
+                    this.path_info[absolute_path] = {
+                        absolute_path: absolute_path,
+                        relative_path: relative_path,
+                        root: relative_root,
+                        document: current_object,
+                        type: 'array'
+                    }
+
+                }
+
+            }
+            //if this is a subdoc
+            else if(current_object.schema && (current_object.schema == relative_root.schema )) {
                 this.path_info[absolute_path] = {
                     absolute_path: absolute_path,
                     relative_path: relative_path,
@@ -305,60 +396,24 @@ class JSONPatchMongoose {
                     type: 'subdoc'
                 }
             }
+            //by process of elimination, this must be a leaf value
+            else {
+                this.path_info[absolute_path] = {
+                    absolute_path: absolute_path,
+                    relative_path: relative_path,
+                    root: relative_root,
+                    document: current_object,
+                    type: 'leaf'
+                }
+            }
+
             if(i==parts.length)
                 break;
-            let part = parts[i];
+            if(part == '-')
+                break;
+
             absolute_path = parts.slice(0,i+1).join('.');
             relative_path = parts.slice(relative_root_index + 1, i+1).join('.');
-
-
-            //pointer to the end of an array gets skipped
-            if(part == '-')
-                break; //- must be the last item in a path
-            
-            //if the current object is an array, the part must be convertable to a integer index
-            if(Array.isArray(current_object)) {
-                part = parseInt(part);
-                if(isNaN(part)) 
-                    throw new Error("Invalid array index: " + part);
-            }
-
-            //if the child property is an array, and it's an array of refs, we need to populate it too
-            if(Array.isArray(current_object[part])) {
-                let array_schema = current_object[part].$schema();
-                if(array_schema.options.type[0].ref) {
-                    if(!current_object.populated(part))
-                        await current_object.populate(part).execPopulate();
-                }
-                
-
-                current_object = current_object[part];
-                continue;
-            }
-
-            //if the current object is an array, and the current part is an index, just keep navigating
-            if(Array.isArray(current_object)) {
-                current_object = current_object[part]
-                if(!(this.save_queue.includes(current_object)))
-                    this.save_queue.push(current_object);
-                continue;
-            }
-
-            //if we're in a subdoc, just continue
-            if((current_object != this.document) && (i > relative_root_index) && (current_object.schema == relative_root.schema)) {
-                current_object = current_object[part];
-                continue;
-            }
-
-            //the current object isn't an array, so let's see if the child needs to be populated
-            if(current_object.schema.obj[part].ref) {
-                //this is a mongoose reference, populate it if needed
-                if(!current_object.populated(part)) 
-                    await current_object.populate(part).execPopulate();
-
-                if(!(this.save_queue.includes(current_object[part])))
-                    this.save_queue.push(current_object[part]);
-            }
 
             current_object = current_object[part];
         };

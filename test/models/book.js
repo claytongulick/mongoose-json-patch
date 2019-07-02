@@ -8,6 +8,14 @@ let Book = new Schema({
         type: Schema.Types.ObjectId,
         ref: "Author"
     },
+    coauthor: {
+        gets_credit: Boolean,
+        author: {
+            type: Schema.Types.ObjectId,
+            ref: "Author"
+        }
+    },
+    reference_id: Schema.Types.ObjectId,
     publisher: String
 }, {
 
