@@ -285,7 +285,7 @@ class JSONPatchMongoose {
                     type: 'root'
                 }
             }
-            else if(current_object.schema && (current_object.schema != relative_root.schema)) {
+            else if(current_object && current_object.schema && (current_object.schema != relative_root.schema)) {
                 this.path_info[absolute_path] = {
                     absolute_path: absolute_path,
                     relative_path: relative_path,

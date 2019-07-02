@@ -1,6 +1,6 @@
 {
   "name": "mongoose-patcher",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "A utility for applying RFC6902 JSONPatch operations to mongoose models",
   "main": "index.js",
   "scripts": {
