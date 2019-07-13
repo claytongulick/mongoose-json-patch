@@ -41,7 +41,7 @@ class JSONPatchMongoose {
     async apply(patch, document) {
         //first, verify the patch is a valid RFC6902 json-patch document
         if(!this.validate(patch))
-            throw new Error(this.errors);
+            throw new Error(JSON.stringify(this.errors));
 
         //next, make sure it passes all rules
         if(this.patch_rules)
