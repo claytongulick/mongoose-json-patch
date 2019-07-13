@@ -157,6 +157,17 @@ describe("Patch", () => {
     });
 
     describe("replace", () => {
+        it("should replace a value", async () => {
+            let author = await Author.findOne({_id: author_id});
+            let patch = [
+                { path: '/email_address', op: 'replace', value: 'thedude@lebowski.com'}
+            ];
+            await author.jsonPatch(patch);
+            author = null;
+            author = await Author.findOne({_id: author_id});
+            assert.equal(author.email_address, 'thedude@lebowski.com');
+
+        });
         it("should set a value on a subdoc", async () => {
             let author = await Author.findOne({_id: author_id});
             let patch = [
@@ -286,6 +297,28 @@ describe("Patch", () => {
             author = null;
             author = await Author.findOne({_id: author_id});
             assert.equal(author.first_name, 'Jimmie');
+
+        });
+
+        it("should execute matching middleware on a virtual path", async ()=> {
+            let author = await Author.findOne({_id: author_id});
+            let patch = [
+                { path: '/payment_methods/-', op: 'add', value: '4242424242424242'}
+            ];
+            let processed;
+            let options = {
+                autosave: true,
+                middleware: [
+                    {op: 'add', path: '/payment_methods/-', handler: 
+                        async (document, item, next) => {
+                            processed = item.value;
+                            //await next(item);
+                        }
+                    }
+                ]
+            }
+            await author.jsonPatch(patch, options);
+            assert.equal(processed, '4242424242424242');
 
         });
     });

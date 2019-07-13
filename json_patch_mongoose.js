@@ -54,7 +54,6 @@ class JSONPatchMongoose {
         for (const item of patch) {
             let {op, path} = item;
 
-            await this.populatePath(path);
             let middleware_handler;
 
             //check to see if we have any middleware defined
@@ -70,10 +69,15 @@ class JSONPatchMongoose {
                     }
                 }
 
-            if(middleware_handler)
-                await middleware_handler(document, item, this[op].bind(this));
-            else
+            let next = async () => {
+                await this.populatePath(path);
                 await this[op](item);
+            }
+
+            if(middleware_handler)
+                await middleware_handler(document, item, next);
+            else
+                await next();
         }
         if(this.options.autosave)
             await this.save();

@@ -6,6 +6,10 @@ let Author = new Schema({
     first_name: String,
     last_name: String,
     publisher: String,
+    email_address: {
+        type: String,
+        default: null
+    },
     best_sellers: [
         {
             type: Schema.Types.ObjectId,
