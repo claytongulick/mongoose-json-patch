@@ -158,7 +158,6 @@ class JSONPatchMongoose {
 
     async move(item) {
         let {from, path} = item;
-        let {from, path} = item;
         from = this.jsonPointerToMongoosePath(from);
         path = this.jsonPointerToMongoosePath(path);
         let from_parts = from.split('.');
