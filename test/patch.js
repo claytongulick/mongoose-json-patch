@@ -267,10 +267,29 @@ describe("Patch", () => {
 
     describe("remove", () => {
         it("should set the path to null", async () => {
+            let author = await Author.findOne({_id: author_id});
+            let patch = [
+                { path: '/first_name', op: 'remove'}
+            ];
+            await author.jsonPatch(patch);
+            author = null;
+            author = await Author.findOne({_id: author_id});
+            assert.equal(author.first_name, null);
 
         });
 
         it("should remove an array element", async () => {
+            let author = await Author.findOne({_id: author_id});
+            let patch = [
+                {op: "remove", path: "/phone_numbers/0"},
+            ];
+
+            await author.jsonPatch(patch);
+            author = null;
+            author = await Author.findOne({_id: author_id});
+            //these already existed
+            //assert.equal(author.phone_numbers[0], "111-111-1111"); -- this was the previous 0 element
+            assert.equal(author.phone_numbers[0], "222-222-2222");
 
         });
 

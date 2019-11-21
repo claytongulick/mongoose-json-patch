@@ -94,8 +94,9 @@ class JSONPatchMongoose {
         //if the path is an array, remove the element, otherwise set to null
         path = this.jsonPointerToMongoosePath(path);
         let current_value = this.document.get(path);
-        if(Array.isArray(current_value.parent()))
-            return current_value.remove();
+        let parent = this.walkPath(path, -1);
+        if(Array.isArray(parent))
+            return parent.pull(current_value);
         this.setPath(path, null);
     }
 
