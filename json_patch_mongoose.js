@@ -14,7 +14,8 @@ class JSONPatchMongoose {
     constructor(schema, options) {
         this.schema = schema;
         this.options = Object.assign({
-            autosave: false
+            autosave: false,
+            autopopulate: true
         },options);
         if(options.rules)
             this.patch_rules = new JSONPatchRules(options.rules, {mode: options.rules_mode});
@@ -70,7 +71,8 @@ class JSONPatchMongoose {
                 }
 
             let next = async () => {
-                await this.populatePath(path);
+                if(this.options.autopopulate)
+                    await this.populatePath(path);
                 await this[op](item);
             }
 
