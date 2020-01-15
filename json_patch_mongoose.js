@@ -314,7 +314,8 @@ class JSONPatchMongoose {
             //If this is an ObjectId, it may or may not be a ref that needs to be populated
             else if(current_object instanceof mongoose.Types.ObjectId) {
                 //if this has a ref in the schema, it needs to be populated
-                if(relative_root.schema.paths[relative_path].options.ref) {
+                if( relative_root.schema.paths[relative_path] &&
+                    relative_root.schema.paths[relative_path].options.ref) {
                     this.path_info[absolute_path] = {
                         absolute_path: absolute_path,
                         relative_path: relative_path,
