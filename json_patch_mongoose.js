@@ -137,13 +137,13 @@ class JSONPatchMongoose {
             }
             else {
                 try {
-                    part = parseInt(index);
+                    part = parseInt(part);
                     //this calls mongoose splice, which has proper change tracking
                     //rfc6902 says we don't spread aray values, we just add an array element
-                    parent.splice(index,0,value);
+                    parent.splice(part,0,value);
                 }
                 catch(err) {
-                    throw new Error("Invalid index value: " + index + " for array add");
+                    throw new Error("Invalid index value: " + part + " for array add");
                 }
             }
         }

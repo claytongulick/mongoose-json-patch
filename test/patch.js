@@ -108,6 +108,25 @@ describe("Patch", () => {
 
         });
 
+        it("should add a value to a new array index", async () => {
+            let author = await Author.findOne({_id: author_id});
+            let patch = [
+                {op: "add", path: "/phone_numbers/2", value: "333-333-3333"},
+                {op: "add", path: "/phone_numbers/3", value: "444-444-4444"}
+            ];
+
+            await author.jsonPatch(patch);
+            author = null;
+            author = await Author.findOne({_id: author_id});
+            //these already existed
+            assert.equal(author.phone_numbers[0], "111-111-1111");
+            assert.equal(author.phone_numbers[1], "222-222-2222");
+            //new ones
+            assert.equal(author.phone_numbers[2], "333-333-3333");
+            assert.equal(author.phone_numbers[3], "444-444-4444");
+
+        });
+
         it("should add a new object to a populated array", async () => {
             let series = await Series.findOne({_id: series_id});
             let patch = [
