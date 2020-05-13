@@ -8,7 +8,7 @@ const Author = require('./models/author');
 const Series = require('./models/series');
 
 let mongod;
-let author_id, coauthor_id, series_id, book_id;
+let author_id, coauthor_id, collaborator_id, series_id, book_id;
 
 before(async () => {
 
@@ -61,6 +61,16 @@ describe("Patch", () => {
             });
         await coauthor.save();
         coauthor_id = coauthor._id;
+
+        let collaborator = new Author(
+            {
+                first_name: "Zaphod", 
+                last_name: "Beeblebrox", 
+                address: {city: "NoWhere", state:"TX", zip: "12345", address_1: "123 anywhere dr"},
+                phone_numbers: ["111-111-1111", "222-222-2222"]
+            });
+        await collaborator.save();
+        collaborator_id = collaborator._id;
         
         let series = new Series({name: "Lord of the Rings", books: []});
         await series.save();
@@ -360,6 +370,50 @@ describe("Patch", () => {
 
         });
     });
+
+    describe("embedded arrays", () => {
+        it("should add to embedded array doc refs", async () => {
+            let book = await Book.findOne({_id: book_id});
+            let patch = [
+                { path: '/collaborators/-', op: 'add', value: { gets_credit: true, author: collaborator_id }}
+            ];
+            let b = await book.jsonPatch(patch);
+            book = await Book.findOne({ _id: book_id });
+            assert.equal(book.collaborators[0].author.toString(), collaborator_id.toString());
+
+        });
+
+        it("should patch array doc refs", async () => {
+            let book = await Book.findOne({_id: book_id});
+            let patch = [
+                { path: '/collaborators/-', op: 'add', value: { gets_credit: true, author: collaborator_id }}
+            ];
+            await book.jsonPatch(patch);
+            patch = [
+                { path: '/collaborators/0/author/first_name', op: 'replace', value: "superman"}
+            ];
+            let book1 = await Book.findOne({_id: book_id});
+            let promise = book1.jsonPatch(patch);
+            await promise;
+            let changed_collaborator = await Author.findOne({ _id: collaborator_id});
+            assert.equal(changed_collaborator.first_name, 'superman');
+        });
+
+        it("should delete array element with refs", async () => {
+
+        });
+    });
+
+    /*
+    describe("testing mongoose api", () => {
+        it("should iterate child schemas", async () => {
+            let book_schema = Book.schema;
+            for(let child_schema of book_schema.childSchemas) {
+                console.log(child_schema);
+            }
+
+        });
+    })*/
     
 
 });

@@ -15,6 +15,15 @@ let Book = new Schema({
             ref: "Author"
         }
     },
+    collaborators: [
+        {
+            gets_credit: Boolean,
+            author: {
+                type: Schema.Types.ObjectId,
+                ref: "Author"
+            }
+        }
+    ],
     reference_id: Schema.Types.ObjectId,
     publisher: String
 }, {

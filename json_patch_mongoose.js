@@ -235,33 +235,11 @@ class JSONPatchMongoose {
         return parent;
     }
 
-    *iteratePath(path) {
-        let parts = path.split(".");
-        let parent = this.document;
-        let part;
-        for (let i=0; i<index; i++) {
-            part = parts[i];
-
-            if(Array.isArray(parent)) {
-                part = parseInt(part);
-                if(isNaN(part))
-                    throw new Error("Invalid index on array: " + part);
-            }
-
-            if(i === (parts.length - 1))
-                break;
-
-            parent = parent[part];
-            yield parent;
-        }
-    }
-
     jsonPointerToMongoosePath(path) {
         path = path.substring(1);
         path = path.replace(/\//g,'.');
         return path;
     }
-
 
     /**
      * Ensure that all refs in the path are populated
@@ -278,11 +256,22 @@ class JSONPatchMongoose {
         let current_object = relative_root;
         this.path_info = {};
 
+        //for a path like '/something/0/foo/name' parts should now look like:
+        //['something','0','foo','name]
+        //so the job is to loop through this and figure out what's a populatable object, and populate it.
+        //we need to keep track of a 'relative root', which is a reference to the most recent document in the hierarchy,
+        //because the next populate call needs to come from that object
+        //this also gets tricky when dealing with arrays, and subdocs in arrays, especially when there's an embedded object in
+        //an array subdoc
+
         for (let i=0; i<=parts.length; i++) {
             if(i < parts.length)
                 part = parts[i];
 
             //cache information about the path for later assignment (setPath)
+            //the path_info structure isn't used in this function, we're just building up some information about
+            //the whole graph, so that later it's a lot easier to figure out how to set properties
+
             //if we're on the root document
             if(current_object == this.document) {
                 this.path_info[absolute_path] = {
@@ -313,9 +302,10 @@ class JSONPatchMongoose {
             }
             //If this is an ObjectId, it may or may not be a ref that needs to be populated
             else if(current_object instanceof mongoose.Types.ObjectId) {
+                let schema_type = relative_root.schema.path(relative_path);
                 //if this has a ref in the schema, it needs to be populated
-                if( relative_root.schema.paths[relative_path] &&
-                    relative_root.schema.paths[relative_path].options.ref) {
+                if( schema_type &&
+                    schema_type.options.ref) {
                     this.path_info[absolute_path] = {
                         absolute_path: absolute_path,
                         relative_path: relative_path,
@@ -342,7 +332,8 @@ class JSONPatchMongoose {
                 }
             }
             //if this is a non-array document, and is not a subdoc, but a ref'd model
-            else if(current_object && current_object.schema && (current_object.schema != relative_root.schema)) {
+            //else if(current_object && current_object.schema && (current_object.schema != relative_root.schema)) {
+            else if(current_object instanceof mongoose.Model) {
                 this.path_info[absolute_path] = {
                     absolute_path: absolute_path,
                     relative_path: relative_path,
@@ -394,7 +385,8 @@ class JSONPatchMongoose {
 
             }
             //if this is a subdoc
-            else if(current_object.schema && (current_object.schema == relative_root.schema )) {
+            //else if(current_object.schema && (current_object.schema == relative_root.schema )) {
+            else if(current_object instanceof mongoose.Types.Document) {
                 this.path_info[absolute_path] = {
                     absolute_path: absolute_path,
                     relative_path: relative_path,
