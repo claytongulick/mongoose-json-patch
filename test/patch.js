@@ -303,7 +303,7 @@ describe("Patch", () => {
             await author.jsonPatch(patch);
             author = null;
             author = await Author.findOne({_id: author_id});
-            assert.equal(author.first_name, null);
+            assert.strictEqual(author.first_name, undefined);
 
         });
 
