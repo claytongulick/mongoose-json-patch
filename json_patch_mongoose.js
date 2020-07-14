@@ -111,7 +111,7 @@ class JSONPatchMongoose {
         if(Array.isArray(parent)) {
             //this should always be true
             if(parent.isMongooseArray) {
-                let array_schema = parent.$schema();
+                let array_schema = parent.schema ? parent.$schema() : parent._schema;
                 //if it looks like this is an array of object refs
                 if(array_schema.options &&  //just
                     array_schema.options.type &&  //being
@@ -348,7 +348,7 @@ class JSONPatchMongoose {
             }
             //if this is an array
             else if(Array.isArray(current_object)) {
-                let array_schema = current_object.$schema();
+                let array_schema = current_object.schema ? current_object.$schema() : current_object._schema;
 
                 //if the current object is an array, the part must be convertable to a integer index
                 if(i < parts.length) {
