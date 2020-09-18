@@ -1,3 +1,8 @@
+/*
+ *   Copyright (c) 2020 Ratio Software, LLC 
+ *   All rights reserved.
+ *   @author Clayton Gulick <clay@ratiosoftware.com>
+ */
 const mms = require("mongodb-memory-server");
 const mongoose = require("mongoose");
 const expect = require("chai").expect;
@@ -403,6 +408,20 @@ describe("Patch", () => {
 
         });
     });
+
+    describe("working without autopopulate", () => {
+        it("should perform basic operations without autopopulate", async () => {
+            let author = await Author.findOne({_id: author_id});
+            let patch = [
+                { path: '/address/city', op: 'replace', value: 'New York'}
+            ];
+            await author.jsonPatch(patch, {autopopulate: false, autosave: true} );
+            author = null;
+            author = await Author.findOne({_id: author_id});
+            assert.equal(author.address.city, 'New York');
+
+        })
+    })
 
     /*
     describe("testing mongoose api", () => {

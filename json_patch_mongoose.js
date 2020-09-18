@@ -71,8 +71,7 @@ class JSONPatchMongoose {
                 }
 
             let next = async () => {
-                if(this.options.autopopulate)
-                    await this.populatePath(path);
+                await this.populatePath(path);
                 await this[op](item);
             }
 
@@ -304,7 +303,9 @@ class JSONPatchMongoose {
             else if(current_object instanceof mongoose.Types.ObjectId) {
                 let schema_type = relative_root.schema.path(relative_path);
                 //if this has a ref in the schema, it needs to be populated
-                if( schema_type &&
+                if( 
+                    this.options.autopopulate && //if we're not populating, treat it as a leaf
+                    schema_type &&
                     schema_type.options.ref) {
                     this.path_info[absolute_path] = {
                         absolute_path: absolute_path,
