@@ -1,3 +1,8 @@
+/*
+ *   Copyright (c) 2020 Ratio Software, LLC 
+ *   All rights reserved.
+ *   @author Clayton Gulick <clay@ratiosoftware.com>
+ */
 const mongoose = require('mongoose');
 const assert = require('assert');
 const patch_schema = require('./schema.json');
@@ -56,6 +61,7 @@ class JSONPatchMongoose {
             let {op, path} = item;
 
             let middleware_handler;
+            let matches;
 
             //check to see if we have any middleware defined
             if(this.options.middleware)
@@ -63,7 +69,8 @@ class JSONPatchMongoose {
                     if(middleware.op == op) {
                         if(!middleware.regex)
                             middleware.regex = new RegExp(middleware.path);
-                        if(middleware.regex.test(path)) {
+                        matches = middleware.regex.exec(path);
+                        if(matches) {
                             middleware_handler = middleware.handler;
                             break;
                         }
@@ -76,7 +83,7 @@ class JSONPatchMongoose {
             }
 
             if(middleware_handler)
-                await middleware_handler(document, item, next);
+                await middleware_handler(document, item, next, matches);
             else
                 await next();
         }

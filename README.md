@@ -82,11 +82,17 @@ In some cases, a value should be changed or manipulated before being applied to 
 
 To handle these cases, middleware can be defined and passed into the options. This allows preprocessing of patch items, or the addition of 'virtual' properties on a model.
 
+Middlware will be passed 4 params:
+document: the doc being patched
+item: the item in the patch set that matches the middleware rule
+next: callback function to continue
+matches (new in 0.2.14): the regex matches from the path match. This allows you to easily grab named capture groups from the regular expression in the path. This is useful for getting things like the index of an operation `{op: 'remove', path: '^/collection/(?<index>\d)$'` matches would contain the results of `new RegEx(path).exec(item.path)` - `matches[0].groups.index` would have the collection index.
+
 ```javascript
 let options = {
     ...
     middleware: [
-        {op: 'replace', path: '/password', handler: async (document, item, next) => {
+        {op: 'replace', path: '/password', handler: async (document, item, next, matches) => {
             item.value = await calculateHash(item.value);
             await next(item);
         }}
