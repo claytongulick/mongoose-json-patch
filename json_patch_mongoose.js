@@ -66,7 +66,12 @@ class JSONPatchMongoose {
             //check to see if we have any middleware defined
             if(this.options.middleware)
                 for(let middleware of this.options.middleware) {
-                    if(middleware.op == op) {
+                    let op_matches;
+                    if(Array.isArray(middleware.op)) 
+                        op_matches = middleware.op.includes(op);
+                    else
+                        op_matches = (middleware.op == op)
+                    if(op_matches) {
                         if(!middleware.regex)
                             middleware.regex = new RegExp(middleware.path);
                         matches = middleware.regex.exec(path);
