@@ -326,7 +326,7 @@ class JSONPatchMongoose {
                         document: current_object,
                         type: 'root'
                     }
-                    await relative_root.populate(relative_path).execPopulate();
+                    await relative_root.populate(relative_path);
                     current_object = relative_root.get(relative_path);
                     relative_root = current_object;
                     relative_root_index = i-1;
@@ -382,7 +382,7 @@ class JSONPatchMongoose {
                         type: 'ref_array'
                     }
                     if(!relative_root.populated(relative_path))
-                        await relative_root.populate(relative_path).execPopulate();
+                        await relative_root.populate(relative_path);
                 }
                 //if it's just an array of subdocs, no linked refs
                 else {
