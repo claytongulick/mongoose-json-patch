@@ -154,7 +154,7 @@ describe("Patch", () => {
 
             series = null;
             series = await Series.findOne({_id: series_id});
-            await series.populate("books").execPopulate();
+            await series.populate("books");
             assert.equal(series.books[1].name, "Fellowship Of The Ring");
             assert.equal(series.books[2].name, "The Two Towers");
 
@@ -171,7 +171,7 @@ describe("Patch", () => {
 
             await series.jsonPatch(patch);
             series = await Series.findOne({_id: series_id});
-            await series.populate("books").execPopulate();
+            await series.populate("books");
             assert.equal(series.books[0].name, "Return Of The King");
             //this should have been changed by the "replace" patch operation on item 0
             let book = await Book.findOne({_id: book_id});
@@ -222,7 +222,7 @@ describe("Patch", () => {
             await book.jsonPatch(patch);
             book = null;
             book = await Book.findOne({_id: book_id});
-            await book.populate("author").execPopulate();
+            await book.populate("author");
             assert.equal(book.author.first_name, 'James');
         });
 
@@ -234,7 +234,7 @@ describe("Patch", () => {
             await book.jsonPatch(patch);
             book = null;
             book = await Book.findOne({_id: book_id});
-            await book.populate("coauthor.author").execPopulate();
+            await book.populate("coauthor.author");
             assert.equal(book.coauthor.author.first_name, 'Clay');
         });
 
@@ -274,7 +274,7 @@ describe("Patch", () => {
             await book.jsonPatch(patch);
             book = null;
             book = await Book.findOne({_id: book_id});
-            await book.populate("coauthor.author").execPopulate();
+            await book.populate("coauthor.author");
             assert.equal(book.coauthor.author.first_name, 'Clayton');
             let coauthor = await Author.findOne({_id: coauthor_id});
             assert.equal(coauthor.first_name, "Clayton");
